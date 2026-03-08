@@ -6,8 +6,12 @@ BEGIN
 END;
 
 -- Ejercicio 2
-CREATE OR REPLACE TRIGGER Actualizar_Salarios
+CREATE OR REPLACE TRIGGER Actualizar_Sueldo
 AFTER UPDATE ON JOBS FOR EACH ROW
+DECLARE
+    CURSOR cur_empleados IS SELECT * FROM employees WHERE job_id = :new.job_id AND salary < :new.MIN_SALARY FOR UPDATE;
 BEGIN
-    UPDATE EMPLOYEES SET salary = :new.MIN_SALARY;
-END;
+    FOR v_emp IN cur_empleados LOOP
+        UPDATE employees SET salary = :new.MIN_SALARY WHERE CURRENT OF cur_empleados;
+    END LOOP;
+END Actualizar_Sueldo;
