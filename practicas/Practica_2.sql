@@ -19,10 +19,26 @@ ALTER TABLE TB_OBJETOS ADD ESTADO VARCHAR(10) ADD NOMBRE_CORRECTO VARCHAR(128);
 
 /*
 CREATE OR REPLACE PROCEDURE PR_COMPROBAR(ESQUEMA IN VARCHAR2) IS
-    CURSOR cur_objects IS SELECT * FROM TB_OBJETOS WHERE ESQUEMA_ORIGINAL = NVL(ESQUEMA, ESQUEMA_ORIGINAL);
+    CURSOR cur_objs IS SELECT * FROM TB_OBJETOS WHERE ESQUEMA_ORIGINAL = NVL(ESQUEMA, ESQUEMA_ORIGINAL) FOR UPDATE;
+    v_prefijo TB_ESTILO.prefijo%type;
 BEGIN
-    FOR v_obj IN cur_objects LOOP
-        
+    FOR v_obj IN cur_objs LOOP
+        BEGIN
+            SELECT prefijo INTO v_prefijo FROM TB_ESTILO WHERE tipo_objeto = v_obj.tipo;
+            IF v_prefijo IS NOT NULL THEN
+                IF v_obj.nombre LIKE (v_prefijo || '%') THEN
+                    UPDATE TB_OBJETOS SET estado = 'CORRECTO' WHERE CURRENT OF cur_objs;
+                ELSE
+                    UPDATE TB_OBJETOS SET estado = 'INCORRECTO', nombre_correcto = (v_prefijo || nombre) WHERE CURRENT OF cur_objs;
+                END IF;
+            END IF;
+        EXCEPTION 
+            WHEN NO_DATA_FOUND THEN 
+                NULL;
+        END;
     END LOOP;
 END;
+/
+
+EXEC PR_COMPROBAR(null);
 */
