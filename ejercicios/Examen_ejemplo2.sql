@@ -1,0 +1,89 @@
+CREATE TABLE TB_TABLAS (
+    ANTERIOR VARCHAR2(30) PRIMARY KEY,
+    NUEVO VARCHAR2(30),
+    FECHA DATE
+);
+
+CREATE TABLE TB_VISTAS (
+    ANTERIOR VARCHAR2(30) PRIMARY KEY,
+    NUEVO VARCHAR2(30),
+    FECHA DATE
+);
+
+CREATE TABLE TB_ERRORES (
+    USUARIO VARCHAR2(30),
+    OBJETO VARCHAR2(30),
+    FECHA DATE
+);
+
+CREATE TABLE A1 (
+    CODIGO NUMBER PRIMARY KEY,
+    NOMBRE VARCHAR2(50)
+);
+
+CREATE TABLE A2 (
+    CODIGO NUMBER PRIMARY KEY,
+    NOMBRE VARCHAR2(50)
+);
+
+CREATE TABLE A3 (
+    CODIGO NUMBER PRIMARY KEY,
+    NOMBRE VARCHAR2(50)
+);
+
+Insert into TB_TABLAS(anterior) values ('A1');
+Insert into TB_TABLAS(anterior) values ('A3');
+Insert into TB_TABLAS(anterior) values ('A2');
+COMMIT;
+
+-- Ejercicio 1
+CREATE OR REPLACE TRIGGER tr_error_vistas
+AFTER UPDATE OF NUEVO ON TB_VISTAS FOR EACH ROW WHEN (new.NUEVO = 'ERROR')
+BEGIN
+    INSERT INTO TB_ERRORES VALUES (USER, :old.anterior, SYSDATE);
+END;
+/
+
+INSERT INTO TB_VISTAS VALUES ('TEST', 'NUEVO', SYSDATE);
+UPDATE TB_VISTAS SET NUEVO = 'MODIFICACION';
+UPDATE TB_VISTAS SET NUEVO = 'ERROR';
+
+-- Ejercicio 2 y 3
+CREATE OR REPLACE PACKAGE PK_ESTILO AS
+    PROCEDURE PR_RENOMBRA_TABLAS;
+    PROCEDURE PR_DESHACER;
+END;
+/
+
+CREATE OR REPLACE PACKAGE BODY PK_ESTILO AS
+    PROCEDURE PR_RENOMBRA_TABLAS IS
+    CURSOR c_tablas IS SELECT * FROM TB_TABLAS WHERE ANTERIOR NOT LIKE('TB_%');
+    BEGIN
+        FOR v_tabla IN c_tablas LOOP
+            EXECUTE IMMEDIATE 'RENAME ' || v_tabla.anterior || ' TO TB_' || v_tabla.anterior;
+            UPDATE TB_TABLAS SET NUEVO = 'TB_' || v_tabla.anterior, FECHA = SYSDATE WHERE ANTERIOR = v_tabla.anterior;
+        END LOOP;
+    END;
+    
+    PROCEDURE PR_DESHACER IS
+    object_not_exist EXCEPTION;
+    PRAGMA EXCEPTION_INIT(object_not_exist, -4043);
+    CURSOR c_tablas IS SELECT * FROM TB_TABLAS WHERE NUEVO IS NOT NULL AND NUEVO != 'ERROR';
+    BEGIN
+        FOR v_tabla IN c_tablas LOOP
+            BEGIN
+                EXECUTE IMMEDIATE 'RENAME ' || v_tabla.nuevo || ' TO ' || v_tabla.anterior;
+                UPDATE TB_TABLAS SET NUEVO = NULL, FECHA = SYSDATE WHERE NUEVO = v_tabla.nuevo;
+            EXCEPTION
+                WHEN object_not_exist THEN
+                    UPDATE TB_TABLAS SET NUEVO = 'ERROR', FECHA = SYSDATE WHERE NUEVO = v_tabla.nuevo;
+            END;
+        END LOOP;
+    END;
+END;
+/
+
+EXEC pk_estilo.pr_renombra_tablas();
+EXEC pk_estilo.pr_deshacer();
+
+RENAME TB_A3 TO A3;
